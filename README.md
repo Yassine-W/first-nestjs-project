@@ -545,3 +545,123 @@ import { APP_PIPE } from '@nestjs/core';
 })
 export class AppModule {}
 ```
+
+## Guards
+
+often referred to as `authorization`. Guards are executed **after** all middleware, but **before** any interceptor or pipe.
+
+Like pipes and exception filters, guards can be `controller-scoped`, `method-scoped`, or `global-scoped`.
+
+### Auth Guard
+
+**_auth.guard.ts_**
+
+```ts
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Observable } from 'rxjs';
+
+@Injectable()
+export class AuthGuard implements CanActivate {
+  canActivate(
+    context: ExecutionContext,
+  ): boolean | Promise<boolean> | Observable<boolean> {
+    const request = context.switchToHttp().getRequest();
+    return this.validateRequest(request);
+  }
+
+  private validateRequest(req: any): boolean {
+    const token = req.headers.authorization;
+    if (token !== 'MiMiCx1') {
+      return false;
+    }
+    req.user = { name: 'Yassine', roles: ['admin', 'sup'] };
+    return true;
+  }
+}
+```
+
+### Role based Guard
+
+**_roles.guard.ts_**
+
+```ts
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Observable } from 'rxjs';
+
+@Injectable()
+export class RolesGuard implements CanActivate {
+  canActivate(
+    context: ExecutionContext,
+  ): boolean | Promise<boolean> | Observable<boolean> {
+    return true;
+  }
+}
+```
+
+#### Creating roles
+
+**_roles.decorator.ts_**
+
+```ts
+import { SetMetadata } from '@nestjs/common';
+
+export const Roles = (...roles: string[]) => SetMetadata('roles', roles);
+```
+
+#### Using roles
+
+```ts
+@Post()
+@Roles('admin') // @SetMetadata('roles', ['admin'])
+async create(@Body() createCatDto: CreateCatDto) {
+  return this.catsService.create(createCatDto);
+}
+```
+
+### Binding (Controller scoped)
+
+```ts
+@Controller('cats')
+@UseGuards(RolesGuard)
+export class CatsController {}
+```
+
+### Binding global
+
+```ts
+const app = await NestFactory.create(AppModule);
+app.useGlobalGuards(new AuthGuard());
+```
+
+Global guards are used across the whole application, for every controller and every route handler. In terms of dependency injection, global guards registered from outside of any module (with useGlobalGuards() as in the example above) cannot inject dependencies since this is done outside the context of any module. In order to solve this issue, you can set up a guard directly from any module using the following construction:
+
+**_app.module.ts_**
+
+```ts
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+
+@Module({
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
+})
+export class AppModule {}
+```
+
+Note that behind the scenes, when a guard returns false, the framework throws a ForbiddenException. If you want to return a different error response, you should throw your own specific exception. For example:
+
+```ts
+throw new UnauthorizedException();
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "Forbidden resource",
+  "error": "Forbidden"
+}
+```

@@ -6,15 +6,20 @@ import {
   Param,
   ParseIntPipe,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { Roles } from 'src/roles.decorator';
+import { RolesGuard } from 'src/roles.guard';
 import { CatsService } from './cats.service';
 import { CreateCatDto } from './dto/create-cat.dto';
 
 @Controller('cats')
+@UseGuards(RolesGuard)
 export class CatsController {
   constructor(private catsService: CatsService) {}
 
   @Post()
+  @Roles('admin')
   async create(@Body() createCatDto: CreateCatDto) {
     return this.catsService.create(createCatDto);
   }
