@@ -1,5 +1,12 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
-import { Cat } from './interfaces/cat.interface';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  ParseIntPipe,
+  Query,
+} from '@nestjs/common';
 import { CatsService } from './cats.service';
 import { CreateCatDto } from './dto/create-cat.dto';
 
@@ -12,9 +19,18 @@ export class CatsController {
     return this.catsService.create(createCatDto);
   }
 
+  @Get(':id')
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.catsService.findOne(id);
+  }
+
   @Get()
-  async findAll(): Promise<Cat[]> {
-    return this.catsService.findAll();
+  async findOneById(@Query('id') id?: number) {
+    if (id != null) {
+      return this.catsService.findOneById(id);
+    } else {
+      return this.catsService.findAll();
+    }
   }
 }
 

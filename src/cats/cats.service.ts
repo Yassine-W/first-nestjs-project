@@ -11,4 +11,12 @@ export class CatsService {
   findAll() {
     return [{ name: 'cat1', age: 3, breed: 'string' } as Cat];
   }
+
+  findOne(id: number) {
+    return { id };
+  }
+
+  findOneById(id: number) {
+    return { msg: 'found by id', id };
+  }
 }
