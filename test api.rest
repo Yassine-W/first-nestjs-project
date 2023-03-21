@@ -1,0 +1,17 @@
+POST http://localhost:3000/cats
+
+{
+    "name": "Gouta",
+    "age": 3,
+    "breed": "blanc"
+}
+
+###
+GET http://localhost:3000/cats
+
+####
+
+GET http://localhost:3000/cats/mine
+####
+
+GET http://localhost:3000/cats/mine2
