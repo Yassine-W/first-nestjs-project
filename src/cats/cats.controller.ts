@@ -7,7 +7,10 @@ import {
   ParseIntPipe,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { DelayInterceptor } from 'src/delay.interceptor';
+import { LoggingInterceptor } from 'src/logging.interceptor';
 import { Roles } from 'src/roles.decorator';
 import { RolesGuard } from 'src/roles.guard';
 import { CatsService } from './cats.service';
@@ -15,6 +18,7 @@ import { CreateCatDto } from './dto/create-cat.dto';
 
 @Controller('cats')
 @UseGuards(RolesGuard)
+@UseInterceptors(LoggingInterceptor, DelayInterceptor)
 export class CatsController {
   constructor(private catsService: CatsService) {}
 
