@@ -12,7 +12,7 @@ export class AuthGuard implements CanActivate {
 
   private validateRequest(req: any): boolean {
     const token = req.headers.authorization;
-    if (token !== 'MiMiCx1') {
+    if (token !== 'Bearer MiMiCx1') {
       return false;
     }
     req.user = { name: 'Yassine', roles: ['admin', 'sup'] };
