@@ -8,11 +8,13 @@ import {
   Query,
   UseGuards,
   UseInterceptors,
+  Ip,
 } from '@nestjs/common';
 import { DelayInterceptor } from 'src/delay.interceptor';
 import { LoggingInterceptor } from 'src/logging.interceptor';
 import { Roles } from 'src/roles.decorator';
 import { RolesGuard } from 'src/roles.guard';
+import { User } from 'src/user.decorator';
 import { CatsService } from './cats.service';
 import { CreateCatDto } from './dto/create-cat.dto';
 
@@ -34,7 +36,13 @@ export class CatsController {
   }
 
   @Get()
-  async findOneById(@Query('id') id?: number) {
+  async findOneById(
+    @Query('id') id: number,
+    @Ip() ip: string,
+    @User() user: any,
+  ) {
+    console.log('Client IP From controller:', ip);
+    console.log('User From controller:', user);
     if (id != null) {
       return this.catsService.findOneById(id);
     } else {

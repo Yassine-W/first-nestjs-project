@@ -665,3 +665,302 @@ throw new UnauthorizedException();
   "error": "Forbidden"
 }
 ```
+
+## Interceptors
+
+An interceptor is a class annotated with the `@Injectable()` decorator and implements the `NestInterceptor` interface.
+
+They make it possible to:
+
+- Bind extra logic before / after method execution
+- Transform the result returned from a function
+- Transform the exception thrown from a function
+- Extend the basic function behavior
+- Completely override a function depending on specific conditions (e.g., for caching purposes)
+
+`Interceptors`, like `controllers`, `providers`, `guards`, and so on, can **inject dependencies** through their `constructor`
+
+### RxJS
+
+Methods I can use inside `pipe`:
+
+- `tap`( callback )
+- `map`( (data) => )
+- `CatchError`( (err) => )
+
+To create a new stream : `of()`
+
+### Call Handler
+
+The `CallHandler` interface implements the `handle()` method, which you can use to invoke the route handler method at some point in your interceptor.
+
+The invocation of the route handler (i.e., calling handle()) is called a `Pointcut`, indicating that it's the point at which our additional logic is inserted.
+
+### Logging Interceptor Example
+
+In this example the `Befor...` text will be showed as soon as the interceptor is executed however the `After...` text will be showed only when the client recieve back the response from the server.
+
+**_logging.interceptor.ts_**
+
+```ts
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+} from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
+
+@Injectable()
+export class LoggingInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    console.log('Before...');
+
+    const now = Date.now();
+    return next.handle().pipe(
+      tap(() => console.log(`After... ${Date.now() - now}ms`)),
+      map((data) => ({ data })),
+    );
+  }
+}
+```
+
+### Binding Interceptors
+
+We use the `@UseInterceptors()` decorator. Like pipes and guards, interceptors can be:
+
+- Controller-scoped
+
+  **_cats.controller.ts_**
+
+  ```ts
+  @UseInterceptors(LoggingInterceptor)
+  export class CatsController {}
+  ```
+
+- Method-scoped
+- Global-scoped
+
+  ```ts
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalInterceptors(new LoggingInterceptor());
+  ```
+
+  Global interceptors are used across the whole application, for every controller and every route handler. In terms of dependency injection, global interceptors registered from outside of any module (with useGlobalInterceptors(), as in the example above) cannot inject dependencies since this is done outside the context of any module. In order to solve this issue, you can set up an interceptor directly from any module using the following construction:
+
+  **_app.module.ts_**
+
+  ```ts
+  import { Module } from '@nestjs/common';
+  import { APP_INTERCEPTOR } from '@nestjs/core';
+
+  @Module({
+    providers: [
+      {
+        provide: APP_INTERCEPTOR,
+        useClass: LoggingInterceptor,
+      },
+    ],
+  })
+  export class AppModule {}
+  ```
+
+### Exception Mapping
+
+Another interesting use-case is to take advantage of RxJS's `catchError()` operator to override thrown exceptions:
+
+**_errors.interceptor.ts_**
+
+```ts
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  BadGatewayException,
+  CallHandler,
+} from '@nestjs/common';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+
+@Injectable()
+export class ErrorsInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    return next
+      .handle()
+      .pipe(catchError((err) => throwError(() => new BadGatewayException())));
+  }
+}
+```
+
+When an exception is thrown, the Exception Filter will first attempt to handle the exception. If it cannot handle the exception, it will pass it on to the Exception Mapping Interceptor, which will attempt to map the exception to an appropriate response. If the Exception Mapping Interceptor also cannot handle the exception, it will be propagated further up the middleware chain to the global error handler.
+
+### Stream overriding (Cache Interceptor)
+
+**_cache.interceptor.ts_**
+
+```ts
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+} from '@nestjs/common';
+import { Observable, of } from 'rxjs';
+
+@Injectable()
+export class CacheInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const isCached = true;
+    if (isCached) {
+      return of([]);
+    }
+    return next.handle();
+  }
+}
+```
+
+This CacheInterceptor has a hardcoded isCached variable and a hardcoded response [] as well. The key point to note is that we return a new stream here, created by the RxJS of() operator, therefore the route handler won't be called at all. When someone calls an endpoint that makes use of CacheInterceptor, the response (a hardcoded, empty array) will be returned immediately.
+
+### Timeout Interceptor
+
+After 5 seconds, request processing will be canceled:
+
+**_timeout.interceptor.ts_**
+
+```ts
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  RequestTimeoutException,
+} from '@nestjs/common';
+import { Observable, throwError, TimeoutError } from 'rxjs';
+import { catchError, timeout } from 'rxjs/operators';
+
+@Injectable()
+export class TimeoutInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    return next.handle().pipe(
+      timeout(5000),
+      catchError((err) => {
+        if (err instanceof TimeoutError) {
+          return throwError(() => new RequestTimeoutException());
+        }
+        return throwError(() => err);
+      }),
+    );
+  }
+}
+```
+
+## Custom Route Decorators
+
+An ES2016 decorator is an expression which returns a function and can take a target, name and property descriptor as arguments.
+
+### Creating and Using Decorator
+
+**_user.decorator.ts_**
+
+```ts
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+
+export const User = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    return request.user;
+  },
+);
+```
+
+then use it:
+
+```ts
+@Get()
+async findOne(@User() user: UserEntity) {
+  console.log(user);
+}
+```
+
+### Decorators with Data
+
+We can use this same decorator with different keys to access different properties. If the user object is deep or complex, this can make for easier and more readable request handler implementations.
+**_user.decorator.ts_**
+
+```ts
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+
+export const User = createParamDecorator(
+  (data: string, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    const user = request.user;
+
+    return data ? user?.[data] : user;
+  },
+);
+```
+
+Then use it:
+
+```ts
+@Get()
+async findOne(@User('firstName') firstName: string) {
+  console.log(`Hello ${firstName}`);
+}
+```
+
+### Hints
+
+- For TypeScript users, `createParamDecorator<T>()` is a generic. This means we can explicitly enforce type safety, for example `createParamDecorator<string>((data, ctx) => ...)`.
+
+- Alternatively, specify a parameter type in the factory function, for example `createParamDecorator((data: string, ctx) => ...)`.
+
+- If we omit both, the type for data will be any.
+
+### Working with Pipes
+
+Nest treats custom param decorators in the same fashion as the built-in ones (`@Body()`, `@Param()` and `@Query()`). This means that pipes are executed for the custom annotated parameters as well (in our examples, the user argument). Moreover, we can apply the pipe directly to the custom decorator.
+
+The `validateCustomDecorators` option must be set to true. ValidationPipe does not validate arguments annotated with the custom decorators by default.
+
+```ts
+@Get()
+async findOne(
+  @User(new ValidationPipe({ validateCustomDecorators: true }))
+  user: UserEntity,
+) {
+  console.log(user);
+}
+```
+
+### Decorator Composition
+
+Nest provides a helper method to compose multiple decorators. For example, suppose we want to combine all decorators related to authentication into a single decorator. This could be done with the following construction:
+
+**_auth.decorator.ts_**
+
+```ts
+import { applyDecorators } from '@nestjs/common';
+
+export function Auth(...roles: Role[]) {
+  return applyDecorators(
+    SetMetadata('roles', roles),
+    UseGuards(AuthGuard, RolesGuard),
+    ApiBearerAuth(),
+    ApiUnauthorizedResponse({ description: 'Unauthorized' }),
+  );
+}
+```
+
+Then use it:
+
+```ts
+@Get('users')
+@Auth('admin')
+findAllUsers() {}
+```
+
+### Warning
+
+The `@ApiHideProperty()` decorator from the `@nestjs/swagger` package is not composable and won't work properly with the applyDecorators function.
