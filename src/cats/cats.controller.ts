@@ -10,6 +10,12 @@ import {
   UseInterceptors,
   Ip,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiHeader,
+  ApiTags,
+} from '@nestjs/swagger';
 import { DelayInterceptor } from 'src/delay.interceptor';
 import { LoggingInterceptor } from 'src/logging.interceptor';
 import { Roles } from 'src/roles.decorator';
@@ -17,7 +23,12 @@ import { RolesGuard } from 'src/roles.guard';
 import { User } from 'src/user.decorator';
 import { CatsService } from './cats.service';
 import { CreateCatDto } from './dto/create-cat.dto';
-
+@ApiTags('cats routes')
+@ApiHeader({
+  name: 'X-MyHeader',
+  description: 'Custom header',
+})
+@ApiBearerAuth()
 @Controller('cats')
 @UseGuards(RolesGuard)
 @UseInterceptors(LoggingInterceptor, DelayInterceptor)
@@ -25,6 +36,10 @@ export class CatsController {
   constructor(private catsService: CatsService) {}
 
   @Post()
+  @ApiCreatedResponse({
+    description: 'The record has been successfully created.',
+    type: CreateCatDto,
+  })
   @Roles('admin')
   async create(@Body() createCatDto: CreateCatDto) {
     return this.catsService.create(createCatDto);

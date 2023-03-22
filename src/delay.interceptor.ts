@@ -12,7 +12,7 @@ export class DelayInterceptor implements NestInterceptor {
     context: ExecutionContext,
     next: CallHandler,
   ): Promise<Observable<any>> {
-    await this.delay(5000);
+    await this.delay(1000);
     return next.handle().pipe(tap((data) => console.log(data)));
   }
 

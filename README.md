@@ -964,3 +964,404 @@ findAllUsers() {}
 ### Warning
 
 The `@ApiHideProperty()` decorator from the `@nestjs/swagger` package is not composable and won't work properly with the applyDecorators function.
+
+## Swagger
+
+To create powerful documentation
+
+### Installation
+
+```bash
+npm install --save @nestjs/swagger
+```
+
+### Bootstrap
+
+Once the installation process is complete, open the `main.ts` file and initialize Swagger using the `SwaggerModule` class:
+
+- Create config
+- Create document
+- Setup Swagger Module
+
+```ts
+//import { NestFactory } from '@nestjs/core';
+//import { AppModule } from './app.module';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+
+async function bootstrap() {
+  //const app = await NestFactory.create(AppModule);
+
+  const config = new DocumentBuilder()
+    .setTitle('Cats example')
+    .setDescription('The cats API description')
+    .setVersion('1.0')
+    .addTag('cats')
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
+
+  //await app.listen(3000);
+}
+//bootstrap();
+```
+
+### Download documentation as JSON
+
+```http
+http://localhost:3000/api-json
+```
+
+### Document options
+
+Make the library generates operation names like `createUser` instead of `UserController_createUser`
+
+```ts
+const options: SwaggerDocumentOptions = {
+  operationIdFactory: (controllerKey: string, methodKey: string) => methodKey,
+};
+const document = SwaggerModule.createDocument(app, config, options);
+```
+
+### Decorator
+
+```ts
+@ApiProperty({
+  description: 'The age of a cat',
+  example: 3,
+  minimum: 1,
+  default: 1,
+  required: false,
+  type: Number,
+  type: [String],
+  isArray: true,
+  enum: ['Admin', 'Moderator', 'User'],
+  enumName: 'UserRole',
+  type: 'array',
+  items: {
+    type: 'array',
+    items: {
+      type: 'number',
+    },
+  },
+  oneOf: [{ $ref: getSchemaPath(Cat) }, { $ref: getSchemaPath(Dog) }],
+  anyOf: [],
+  allOf: [],
+})
+//////////////////////////////
+@ApiPropertyOptional()
+//////////////////////////////
+@ApiExtraModels(ExtraModel)
+export class CreateCatDto {}
+// Alternatively, we can pass an options object with the extraModels property specified to the SwaggerModule#createDocument() method:
+const document = SwaggerModule.createDocument(app, options, {
+  extraModels: [ExtraModel],
+});
+```
+
+### Tags
+
+```ts
+@ApiTags('cats routes')
+@Controller('cats')
+export class CatsController {}
+```
+
+### Headers
+
+```ts
+@ApiHeader({
+  name: 'X-MyHeader',
+  description: 'Custom header',
+})
+@Controller('cats')
+export class CatsController {}
+```
+
+### Responses
+
+```ts
+@Post()
+@ApiResponse({ status: 201, description: 'The record has been successfully created.'})
+@ApiResponse({ status: 403, description: 'Forbidden.'})
+async create(@Body() createCatDto: CreateCatDto) {
+  this.catsService.create(createCatDto);
+}
+```
+
+Nest provides a set of short-hand API response decorators that inherit from the @ApiResponse decorator:
+
+- `@ApiOkResponse()`
+- `@ApiCreatedResponse()`
+- `@ApiAcceptedResponse()`
+- `@ApiNoContentResponse()`
+- `@ApiMovedPermanentlyResponse()`
+- `@ApiFoundResponse()`
+- `@ApiBadRequestResponse()`
+- `@ApiUnauthorizedResponse()`
+- `@ApiNotFoundResponse()`
+- `@ApiForbiddenResponse()`
+- `@ApiMethodNotAllowedResponse()`
+- `@ApiNotAcceptableResponse()`
+- `@ApiRequestTimeoutResponse()`
+- `@ApiConflictResponse()`
+- `@ApiPreconditionFailedResponse()`
+- `@ApiTooManyRequestsResponse()`
+- `@ApiGoneResponse()`
+- `@ApiPayloadTooLargeResponse()`
+- `@ApiUnsupportedMediaTypeResponse()`
+- `@ApiUnprocessableEntityResponse()`
+- `@ApiInternalServerErrorResponse()`
+- `@ApiNotImplementedResponse()`
+- `@ApiBadGatewayResponse()`
+- `@ApiServiceUnavailableResponse()`
+- `@ApiGatewayTimeoutResponse()`
+- `@ApiDefaultResponse()`
+
+```ts
+@Post()
+@ApiCreatedResponse({ description: 'The record has been successfully created.'})
+@ApiForbiddenResponse({ description: 'Forbidden.'})
+async create(@Body() createCatDto: CreateCatDto) {
+  this.catsService.create(createCatDto);
+}
+```
+
+### File upload
+
+We can enable file upload for a specific method with the `@ApiBody()` decorator together with `@ApiConsumes()`.
+
+Here's a full example using the File Upload technique:
+
+```ts
+@UseInterceptors(FileInterceptor('file'))
+@ApiConsumes('multipart/form-data')
+@ApiBody({
+  description: 'List of cats',
+  type: FileUploadDto,
+})
+uploadFile(@UploadedFile() file) {}
+```
+
+Where `FileUploadDto` is defined as follows:
+
+```ts
+class FileUploadDto {
+  @ApiProperty({ type: 'string', format: 'binary' })
+  file: any;
+}
+```
+
+To handle `multiple files` uploading, we can define `FilesUploadDto` as follows:
+
+```ts
+class FilesUploadDto {
+  @ApiProperty({ type: 'array', items: { type: 'string', format: 'binary' } })
+  files: any[];
+}
+```
+
+### Extensions
+
+To add an Extension to a request use the `@ApiExtension()` decorator. The extension name must be prefixed with x-.
+
+```ts
+@ApiExtension('x-foo', { hello: 'world' })
+```
+
+### Advanced: Generic
+
+With the ability to provide Raw Definitions, we can define Generic schema for Swagger UI. `Skipped`
+
+### Security
+
+To define which security mechanisms should be used for a specific operation, we use the `@ApiSecurity()` decorator.
+
+```ts
+@ApiSecurity('basic')
+@Controller('cats')
+export class CatsController {}
+```
+
+Before we run the application, add the security definition to base document using `DocumentBuilder`
+
+```ts
+const options = new DocumentBuilder().addSecurity('basic', {
+  type: 'http',
+  scheme: 'basic',
+});
+```
+
+Some of the most popular authentication techniques are built-in (e.g., basic and bearer) and therefore we don't have to define security mechanisms manually as shown above.
+
+#### Basic authentication
+
+A simple HTTP-based authentication scheme where the client sends a `username` and `password` in the HTTP headers of each request. The server then verifies the credentials and grants access to the protected resource if they are valid.
+
+```ts
+@ApiBasicAuth()
+@Controller('cats')
+export class CatsController {}
+```
+
+```ts
+const options = new DocumentBuilder().addBasicAuth();
+```
+
+#### Bearer authentication
+
+A type of `token-based authentication` where the client sends an access token in the HTTP headers of each request. The server then validates the token and grants access to the protected resource if the token is valid.
+
+```ts
+@ApiBearerAuth()
+@Controller('cats')
+export class CatsController {}
+```
+
+```ts
+const options = new DocumentBuilder().addBearerAuth();
+```
+
+#### OAuth2 authentication
+
+An authorization framework that allows third-party applications to access resources on behalf of a user. OAuth2 typically involves the user granting permission to the third-party application to access their resources by providing an access token.
+
+```ts
+@ApiOAuth2(['pets:write'])
+@Controller('cats')
+export class CatsController {}
+```
+
+```ts
+const options = new DocumentBuilder().addOAuth2();
+```
+
+#### Cookie authentication
+
+A type of authentication where the server sets a cookie on the client's browser containing a session ID or other information that identifies the user. The client then sends the cookie in the HTTP headers of each request, and the server verifies the cookie to authenticate the user.
+
+```ts
+@ApiCookieAuth()
+@Controller('cats')
+export class CatsController {}
+```
+
+```ts
+const options = new DocumentBuilder().addCookieAuth('optional-session-id');
+```
+
+### Mapped Types
+
+When building `input validation types` (also called DTOs), it's often useful to build create and update variations on the same type. For example, the create variant may require all fields, while the update variant may make all fields optional.
+
+```ts
+import { ApiProperty } from '@nestjs/swagger';
+
+export class CreateCatDto {
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  age: number;
+
+  @ApiProperty()
+  breed: string;
+}
+```
+
+#### Partial
+
+The `PartialType()` function returns a type (class) with all the properties of the input type set to optional.
+
+```ts
+export class UpdateCatDto extends PartialType(CreateCatDto) {}
+```
+
+#### Pick
+
+The `PickType()` function constructs a new type (class) by picking a set of properties from an input type.
+
+```ts
+export class UpdateCatAgeDto extends PickType(CreateCatDto, ['age'] as const) {}
+```
+
+#### Omit
+
+The `OmitType()` function constructs a type by picking all properties from an input type and then removing a particular set of keys.
+
+```ts
+export class UpdateCatDto extends OmitType(CreateCatDto, ['name'] as const) {}
+```
+
+#### Intersection
+
+The `IntersectionType()` function combines two types into one new type (class).
+
+```ts
+export class UpdateCatDto extends IntersectionType(
+  CreateCatDto,
+  AdditionalCatInfo,
+) {}
+```
+
+#### Composition
+
+The type mapping utility functions are composable. For example, the following will produce a type (class) that has all of the properties of the CreateCatDto type except for name, and those properties will be set to optional:
+
+```ts
+export class UpdateCatDto extends PartialType(
+  OmitType(CreateCatDto, ['name'] as const),
+) {}
+```
+
+### CLI Plugin
+
+The Swagger plugin will automatically:
+
+- Annotate all DTO properties with `@ApiProperty` unless `@ApiHideProperty` is used
+- Set the required property depending on the question mark (e.g. name?: string will set required: false)
+- Set the type or enum property depending on the type (supports arrays as well)
+- Set the default property based on the assigned default value
+- Set several validation rules based on class-validator decorators (if classValidatorShim set to true)
+- Add a response decorator to every endpoint with a proper status and type (response model)
+- Generate descriptions for properties and endpoints based on comments (if `introspectComments` set to true)
+- Generate example values for properties based on comments (if `introspectComments` set to true)
+
+_The plugin will automatically generate any missing swagger properties, but if you need to override them, you simply set them explicitly via `@ApiProperty()`._
+
+**_nest-cli.json_**
+
+```JSON
+{
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@nestjs/swagger",
+        "options": {
+          "classValidatorShim": false,
+          "introspectComments": true
+        }
+      }
+    ]
+  }
+}
+```
+
+_Make sure to delete the `/dist` folder and rebuild your application whenever plugin options are updated._
+
+#### Comments introspection
+
+With the comments introspection feature enabled, CLI plugin will generate descriptions and example values for properties based on comments.
+
+```ts
+/**
+ * A list of user's roles
+ * @example ['admin']
+ */
+@ApiProperty({
+  description: `A list of user's roles`,
+  example: ['admin'],
+})
+roles: RoleEnum[] = [];
+```
