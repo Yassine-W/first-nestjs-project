@@ -1365,3 +1365,57 @@ With the comments introspection feature enabled, CLI plugin will generate descri
 })
 roles: RoleEnum[] = [];
 ```
+
+### Multiple Specifications
+
+```ts
+import { NestFactory } from '@nestjs/core';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { AppModule } from './app.module';
+import { CatsModule } from './cats/cats.module';
+import { DogsModule } from './dogs/dogs.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  /**
+   * createDocument(application, configurationOptions, extraOptions);
+   *
+   * createDocument method takes an optional 3rd argument "extraOptions"
+   * which is an object with "include" property where you can pass an Array
+   * of Modules that you want to include in that Swagger Specification
+   * E.g: CatsModule and DogsModule will have two separate Swagger Specifications which
+   * will be exposed on two different SwaggerUI with two different endpoints.
+   */
+
+  const options = new DocumentBuilder()
+    .setTitle('Cats example')
+    .setDescription('The cats API description')
+    .setVersion('1.0')
+    .addTag('cats')
+    .build();
+
+  const catDocument = SwaggerModule.createDocument(app, options, {
+    include: [CatsModule],
+  });
+  SwaggerModule.setup('api/cats', app, catDocument);
+
+  const secondOptions = new DocumentBuilder()
+    .setTitle('Dogs example')
+    .setDescription('The dogs API description')
+    .setVersion('1.0')
+    .addTag('dogs')
+    .build();
+
+  const dogDocument = SwaggerModule.createDocument(app, secondOptions, {
+    include: [DogsModule],
+  });
+  SwaggerModule.setup('api/dogs', app, dogDocument);
+
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+- Navigate to http://localhost:3000/api/cats to see the Swagger UI for cats.
+- In turn, http://localhost:3000/api/dogs will expose the Swagger UI for dogs
