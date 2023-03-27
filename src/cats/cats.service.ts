@@ -17,6 +17,8 @@ export class CatsService {
   }
 
   findOneById(id: number) {
-    return { msg: 'found by id', id };
+    const response = { msg: 'found by id', id };
+    console.log(response);
+    return response;
   }
 }

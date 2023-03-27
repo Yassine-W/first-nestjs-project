@@ -16,11 +16,11 @@ import {
   ApiHeader,
   ApiTags,
 } from '@nestjs/swagger';
-import { DelayInterceptor } from 'src/delay.interceptor';
-import { LoggingInterceptor } from 'src/logging.interceptor';
-import { Roles } from 'src/roles.decorator';
-import { RolesGuard } from 'src/roles.guard';
-import { User } from 'src/user.decorator';
+import { DelayInterceptor } from '../delay.interceptor';
+import { LoggingInterceptor } from '../logging.interceptor';
+import { Roles } from '../roles.decorator';
+import { RolesGuard } from '../roles.guard';
+import { User } from '../user.decorator';
 import { CatsService } from './cats.service';
 import { CreateCatDto } from './dto/create-cat.dto';
 @ApiTags('cats routes')
@@ -50,16 +50,22 @@ export class CatsController {
     return this.catsService.findOne(id);
   }
 
+  // @Get()
+  // findAll() {
+  //   return this.catsService.findAll();
+  // }
+
   @Get()
   async findOneById(
-    @Query('id') id: number,
+    @Query('id') idStr: string,
     @Ip() ip: string,
     @User() user: any,
   ) {
     console.log('Client IP From controller:', ip);
     console.log('User From controller:', user);
-    if (id != null) {
-      return this.catsService.findOneById(id);
+    if (idStr != null) {
+      const id = Number(idStr);
+      return this.catsService.findOneById(parseInt(`${id}`));
     } else {
       return this.catsService.findAll();
     }

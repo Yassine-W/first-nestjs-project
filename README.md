@@ -1503,3 +1503,181 @@ bootstrap();
 
 - Navigate to http://localhost:3000/api/cats to see the Swagger UI for cats.
 - In turn, http://localhost:3000/api/dogs will expose the Swagger UI for dogs
+
+## Tesing
+
+```bash
+npm i --save-dev @nestjs/testing
+```
+
+### Unit Testing
+
+```ts
+import { Test, TestingModule } from '@nestjs/testing';
+import { User } from './interfaces/user.interface';
+import { UsersController } from './users.controller';
+import { UsersService } from './users.service';
+
+describe('UsersController', () => {
+  let usersController: UsersController;
+  let usersService: UsersService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [UsersController],
+      providers: [UsersService],
+    }).compile();
+
+    usersController = module.get<UsersController>(UsersController);
+    usersService = module.get<UsersService>(UsersService);
+  });
+
+  it('should be defined', () => {
+    expect(usersController).toBeDefined();
+  });
+
+  describe('findAll', () => {
+    it('should return an array of users', async () => {
+      const result: User[] = [
+        {
+          id: 1,
+          name: 'Yassine',
+          email: 'yassine@witekio.fr',
+          age: 24,
+          roles: ['Admin'],
+        },
+        {
+          id: 2,
+          name: 'Leo',
+          email: 'leo@witekio.fr',
+          roles: ['Supervisor'],
+        },
+      ];
+      // jest.spyOn(usersService, 'findAll').mockResolvedValue(result);
+
+      expect(await usersService.findAll()).toEqual(result);
+    });
+  });
+
+  describe('create', () => {
+    it('should create a new user with the specified properties', async () => {
+      const newUser = {
+        name: 'testing user',
+        email: 'test@witekio.ts',
+        password: 'azerty123',
+        age: 0,
+        roles: ['tester'],
+      };
+      const createdUser = await usersService.create(newUser);
+      expect(createdUser).toEqual(
+        expect.objectContaining({
+          name: 'testing user',
+          email: 'test@witekio.ts',
+          age: 0,
+          roles: expect.arrayContaining(['tester']),
+        }),
+      );
+    });
+
+    it('should create a new user with expected fields', async () => {
+      const newUser = {
+        name: 'testing user',
+        email: 'test@witekio.ts',
+        password: 'azerty123',
+        age: 0,
+        roles: ['tester'],
+      };
+      const createdUser = await usersService.create(newUser);
+      expect(createdUser).toEqual(
+        expect.objectContaining({
+          name: expect.any(String),
+          email: expect.any(String),
+          age: expect.any(Number),
+          roles: expect.arrayContaining([expect.any(String)]),
+        }),
+      );
+    });
+  });
+
+  describe('update', () => {
+    it('should update user', async () => {
+      const updates = { age: 99 };
+      const updatedUser = await usersService.update(1, updates);
+      expect(updatedUser).toEqual(
+        expect.objectContaining({
+          age: 99,
+        }),
+      );
+    });
+  });
+});
+```
+
+### E2E Testing
+
+```ts
+import { HttpStatus, INestApplication, ValidationPipe } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { UsersController } from '../src/users/users.controller';
+import * as request from 'supertest';
+import { UsersService } from '../src/users/users.service';
+
+describe('CatsController', () => {
+  let app: INestApplication;
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      controllers: [UsersController],
+      providers: [UsersService],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+    await app.init();
+  });
+
+  it(`Create user, make sure it was added to DB then update it`, async () => {
+    const newUser = {
+      name: 'testing user',
+      email: 'test@witekio.ts',
+      password: 'azerty123',
+      age: 0,
+      roles: ['tester'],
+    };
+    return request(app.getHttpServer())
+      .post('/users')
+      .send(newUser)
+      .expect(HttpStatus.CREATED)
+      .then(async (response) => {
+        const createdUserId = response.body.id;
+        return request(app.getHttpServer())
+          .get(`/users/${createdUserId}`)
+          .expect(HttpStatus.OK)
+          .expect({
+            id: createdUserId,
+            name: 'testing user',
+            email: 'test@witekio.ts',
+            age: 0,
+            roles: ['tester'],
+          })
+          .then(() => {
+            const updates = { age: 99 };
+            return request(app.getHttpServer())
+              .patch(`/users/${createdUserId}`)
+              .send(updates)
+              .expect(HttpStatus.OK)
+              .expect({
+                id: createdUserId,
+                name: 'testing user',
+                email: 'test@witekio.ts',
+                age: 99,
+                roles: ['tester'],
+              });
+          });
+      });
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+});
+```
