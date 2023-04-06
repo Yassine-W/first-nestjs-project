@@ -13,12 +13,13 @@
   - [Use](#use)
     - [Global Use](#global-use)
     - [Specific Use](#specific-use)
+  - [Service Inside Service](#service-inside-service)
 - [Exception](#exception)
   - [Throw standard exception:](#throw-standard-exception-)
     - [Example 1](#example-1)
     - [Example 2](#example-2)
   - [Custom Exceptions](#custom-exceptions)
-  - [Built-in HTTP exceptions#](#built-in-http-exceptions-)
+  - [Built-in HTTP exceptions](#built-in-http-exceptions)
   - [Exception filters](#exception-filters)
     - [Creation](#creation-1)
     - [Binding](#binding)
@@ -33,6 +34,7 @@
     - [Parameter Scoped Pipes](#parameter-scoped-pipes)
     - [Global Scoped Pipes](#global-scoped-pipes)
 - [Guards](#guards)
+  - [Service inside guard](#service-inside-guard)
   - [Auth Guard](#auth-guard)
   - [Role based Guard](#role-based-guard)
     - [Creating roles](#creating-roles)
@@ -84,12 +86,13 @@
   - [Unit Testing](#unit-testing)
   - [E2E Testing](#e2e-testing)
 - [TypeORM](#typeorm)
+  - [Principe](#principe)
   - [Init](#init)
   - [Creating entity](#creating-entity)
     - [Remark](#remark)
   - [Relations](#relations)
   - [Auto-load entities](#auto-load-entities)
-    - [Warning](#warning-1)
+  - [Transactions](#transactions)
 
 ```bash
 nest new my-nest-project
@@ -235,6 +238,12 @@ export class AppModule implements NestModule {
 }
 ```
 
+### Service Inside Service
+
+- `Export` the `service` in the module file
+- `Import` the `module` that has the exported service inside the other module
+- `Inject` the service inside the other service using its constructor
+
 ## Exception
 
 Nest comes with a built-in exceptions layer which is responsible for processing all unhandled exceptions across an application. When an exception is not handled by your application code, it is caught by this layer, which then automatically sends an appropriate user-friendly response.
@@ -311,7 +320,7 @@ export class ForbiddenException extends HttpException {
 throw new ForbiddenException();
 ```
 
-### Built-in HTTP exceptions#
+### Built-in HTTP exceptions
 
 Nest provides a set of standard exceptions that inherit from the base HttpException. These are exposed from the `@nestjs/common` package, and represent many of the most common HTTP exceptions:
 
@@ -668,6 +677,27 @@ export class AppModule {}
 often referred to as `authorization`. Guards are executed **after** all middleware, but **before** any interceptor or pipe.
 
 Like pipes and exception filters, guards can be `controller-scoped`, `method-scoped`, or `global-scoped`.
+
+### Service inside guard
+
+To inject service in guard:
+
+- Create a global module.
+  ```ts
+  @Global()
+  @Module({
+    providers: [KeyService],
+    exports: [KeyService],
+  })
+  export class ApiModule {}
+  ```
+- Inject service into guard
+
+```ts
+export class ApiGuard implements CanActivate {
+  constructor(private readonly KeyService) {}
+}
+```
 
 ### Auth Guard
 
@@ -1717,6 +1747,29 @@ describe('CatsController', () => {
 
 ## TypeORM
 
+DONT FORGET `@Entity()` KEYWORD!
+
+### Principe
+
+Connect to database inside **_app.module.ts_** then import the entity I need in each module
+
+```ts
+@Module({
+  imports: [TypeOrmModule.forFeature([User])],
+  // controllers: [UsersController],
+  // providers: [UsersService],
+})
+```
+
+To use just inject directory and go
+
+```ts
+constructor(
+  @InjectRepository(User)
+  private usersRepository: Repository<User>,
+) {}
+```
+
 ### Init
 
 ```bash
@@ -1919,6 +1972,42 @@ Manually adding entities to the entities array of the data source options can be
   export class AppModule {}
   ```
 
-#### Warning
+- **_Warning:_** Entities that aren't registered through the `forFeature()` method, but are only referenced from the entity (via a relationship), won't be included by way of the autoLoadEntities setting.
 
-Entities that aren't registered through the `forFeature()` method, but are only referenced from the entity (via a relationship), won't be included by way of the autoLoadEntities setting.
+### Transactions
+
+A transaction is a single unit of logic or work, sometimes made up of multiple operations.
+
+A database transaction, by definition, must be `atomic` (it must either be complete in its entirety or have no effect whatsoever), `consistent` (it must conform to existing constraints in the database), `isolated` (it must not affect other transactions) and `durable` (it must get written to persistent storage). (`ACID`)
+
+- First, we need to inject the DataSource object into a class in the normal way:
+
+  ```ts
+  @Injectable()
+  export class UsersService {
+    constructor(private dataSource: DataSource) {}
+  }
+  ```
+
+- Then, we can use this object to create a transaction:
+
+```ts
+async createMany(users: User[]) {
+  const queryRunner = this.dataSource.createQueryRunner();
+
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
+  try {
+    await queryRunner.manager.save(users[0]);
+    await queryRunner.manager.save(users[1]);
+
+    await queryRunner.commitTransaction();
+  } catch (err) {
+    // since we have errors lets rollback the changes we made
+    await queryRunner.rollbackTransaction();
+  } finally {
+    // you need to release a queryRunner which was manually instantiated
+    await queryRunner.release();
+  }
+}
+```
